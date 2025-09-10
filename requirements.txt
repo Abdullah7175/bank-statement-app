@@ -1,0 +1,12 @@
+Django
+djangorestframework
+django-cors-headers
+opencv-python
+PyMuPDF
+pytesseract
+opencv-python-headless==4.8.1.78  # already in stdlib ≥ 3.3
+pdfplumber
+huggingface_hub
+Pillow
+# Add any other Python libraries your project uses, e.g.,
+# psycopg2-binary (if you plan to switch to PostgreSQL)
