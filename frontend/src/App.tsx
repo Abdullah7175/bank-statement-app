@@ -100,15 +100,21 @@ function App() {
         const formData = new FormData();
         formData.append('file', acceptedFiles[0]);
         try {
-          const uploadUrl = 'http://localhost:8000/api/pdf/upload/';
+          const uploadUrl = 'http://52.90.161.43:8000/api/pdf/upload/';
           console.log('Uploading to:', uploadUrl);
 
           const startTime = performance.now();
 
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+          
           const response = await fetch(uploadUrl, {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
           });
+          
+          clearTimeout(timeoutId);
           const endTime = performance.now();
           console.log(`Upload + server processing took ${(endTime - startTime).toFixed(2)} ms`);
           if (!response.ok) {
@@ -136,7 +142,14 @@ function App() {
           setIsAnalyzing(false);
           setShowResults(true);
         } catch (e) {
-          setError('Network or server error');
+          console.error('Upload error:', e);
+          if (e.name === 'AbortError') {
+            setError('Request timed out. The PDF is too large or complex. Please try a smaller file.');
+          } else if (e.message.includes('Failed to fetch')) {
+            setError('Cannot connect to server. Please check your internet connection.');
+          } else {
+            setError(`Network or server error: ${e.message}`);
+          }
           setIsAnalyzing(false);
         }
       }

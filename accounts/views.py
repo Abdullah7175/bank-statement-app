@@ -56,8 +56,10 @@ def upload_pdf(request):
         )
         try:
             file_path = pdf_upload.file.path
+            print(f"Processing PDF: {file_path}")
             extractor = BankStatementExtractor()
             results = extractor.process_bank_statement(file_path)
+            print(f"PDF processing completed successfully")
             if 'error' in results:
                 pdf_upload.processing_error = results['error']
                 pdf_upload.save()
@@ -100,10 +102,12 @@ def upload_pdf(request):
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
         except Exception as e:
-            pdf_upload.processing_error = str(e)
+            error_msg = f'Error processing PDF: {str(e)}'
+            print(f"PDF processing error: {error_msg}")
+            pdf_upload.processing_error = error_msg
             pdf_upload.save()
             return Response(
-                {'error': f'Error processing PDF: {str(e)}'}, 
+                {'error': error_msg}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     except Exception as e:
