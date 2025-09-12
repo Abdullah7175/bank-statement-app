@@ -52,12 +52,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/uploads /app/logs /app/pdf_output /app/media/pdfs
-
 # Create a non-root user for security
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+RUN useradd --create-home --shell /bin/bash app
+
+# Create necessary directories and set proper permissions
+RUN mkdir -p /app/uploads /app/logs /app/pdf_output /app/media/pdfs && \
+    chown -R app:app /app && \
+    chmod -R 755 /app/uploads /app/logs /app/pdf_output /app/media/pdfs
+
 USER app
 
 # Expose port
