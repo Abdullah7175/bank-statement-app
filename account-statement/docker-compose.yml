@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  backend:
+  bank-ocr-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: bank-statement-ocr-backend
+    container_name: bank-statement-ocr
     ports:
       - "8000:8000"
     environment:
@@ -21,19 +21,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - bank-ocr-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: bank-statement-ocr-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
     networks:
       - bank-ocr-network
 
