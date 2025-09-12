@@ -145,12 +145,25 @@ def extract_from_pdf_bytes(pdf_bytes):
             # Use image_to_text for vision models
             response = client.image_to_text(
                 image=img_b64,
-                prompt=f"{SYSTEM_PROMPT}\n\nExtract structured bank statement data from this page.",
                 max_new_tokens=4096,
                 temperature=0.0,
             )
 
-            page_json = safe_json_parse(response[0].generated_text)
+            # Parse the response and add system prompt context
+            raw_text = response[0].generated_text
+            
+            # Create a combined prompt for better extraction
+            combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
+            
+            # Use text generation to get structured output
+            text_response = client.text_generation(
+                model=MODEL_ID,
+                inputs=combined_prompt,
+                max_new_tokens=4096,
+                temperature=0.0,
+            )
+            
+            page_json = safe_json_parse(text_response[0].generated_text)
 
             # merge metadata (fill only if empty)
             for key in ["account_number", "customer_name", "iban_number",
