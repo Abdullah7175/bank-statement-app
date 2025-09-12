@@ -50,8 +50,8 @@ def encode_image(img):
 
 # ---------- Hugging Face Client ----------
 client = InferenceClient(
-    provider="fireworks-ai",
-    api_key=HF_TOKEN,
+    model=MODEL_ID,
+    token=HF_TOKEN,
 )
 
 SYSTEM_PROMPT = """
@@ -142,8 +142,7 @@ def extract_from_pdf_bytes(pdf_bytes):
 
             img_b64 = encode_image(img)
 
-            response = client.chat.completions.create(
-                model=MODEL_ID,
+            response = client.chat_completion(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": [
@@ -155,7 +154,7 @@ def extract_from_pdf_bytes(pdf_bytes):
                 temperature=0.0,
             )
 
-            page_json = safe_json_parse(response.choices[0].message["content"])
+            page_json = safe_json_parse(response[0].message.content)
 
             # merge metadata (fill only if empty)
             for key in ["account_number", "customer_name", "iban_number",
