@@ -115,19 +115,15 @@ def extract_from_pdf(pdf_path):
 
         img_b64 = encode_image(img)
 
-        response = client.chat_completion(
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": [
-                    {"type": "text", "text": "Extract structured bank statement data from this page."},
-                    {"type": "image_url", "image_url": {"url": img_b64}}
-                ]}
-            ],
-            max_tokens=4096,
+        # Use image_to_text for vision models
+        response = client.image_to_text(
+            image=img_b64,
+            prompt=f"{SYSTEM_PROMPT}\n\nExtract structured bank statement data from this page.",
+            max_new_tokens=4096,
             temperature=0.0,
         )
 
-        page_json = safe_json_parse(response[0].message.content)
+        page_json = safe_json_parse(response[0].generated_text)
 
         # merge metadata (fill only if empty)
         for key in ["account_number", "customer_name", "iban_number",
