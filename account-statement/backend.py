@@ -49,8 +49,16 @@ def encode_image(img):
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode("utf-8")
 
 # ---------- Hugging Face Client ----------
-# Initialize Hugging Face client (using provider like working code)
-client = InferenceClient(provider="fireworks-ai", api_key=HF_TOKEN)
+# Initialize Hugging Face client
+try:
+    client = InferenceClient(provider="fireworks-ai", api_key=HF_TOKEN)
+    print("[INFO] Created Hugging Face client with fireworks-ai provider")
+except Exception as e:
+    print(f"[WARN] Failed to create client with provider, trying standard method: {e}")
+    client = InferenceClient(
+        model=MODEL_ID,
+        token=HF_TOKEN,
+    )
 
 SYSTEM_PROMPT = """
 You are a universal bank statement parser for English and Arabic.
@@ -142,22 +150,40 @@ def extract_from_pdf_bytes(pdf_bytes):
             img_b64 = encode_image(img)
             
             try:
-                # Use chat completions with vision model (like the working code)
-                response = client.chat.completions.create(
-                    model=MODEL_ID,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": [
-                            {"type": "text", "text": "Extract all details and transactions from this statement."},
-                            {"type": "image_url", "image_url": {"url": img_b64}}
-                        ]}
-                    ],
-                    temperature=0,
-                    max_tokens=3072,
-                    response_format={"type": "json_object"}
-                )
+                # Try chat completions first (for fireworks-ai provider)
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL_ID,
+                        messages=[
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": [
+                                {"type": "text", "text": "Extract all details and transactions from this statement."},
+                                {"type": "image_url", "image_url": {"url": img_b64}}
+                            ]}
+                        ],
+                        temperature=0,
+                        max_tokens=3072,
+                        response_format={"type": "json_object"}
+                    )
+                    raw_text = response.choices[0].message["content"]
+                except AttributeError:
+                    # Fallback to image_to_text + text_generation for standard InferenceClient
+                    response = client.image_to_text(
+                        image=img_b64,
+                    )
+                    raw_text = response[0].generated_text
+                    
+                    # Create a combined prompt for better extraction
+                    combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
+                    
+                    text_response = client.text_generation(
+                        model=MODEL_ID,
+                        inputs=combined_prompt,
+                        max_new_tokens=4096,
+                        temperature=0.0,
+                    )
+                    raw_text = text_response[0].generated_text
                 
-                raw_text = response.choices[0].message["content"]
                 page_json = safe_json_parse(raw_text)
                 
             except Exception as e:
