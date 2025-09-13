@@ -1,33 +1,16 @@
 version: '3.8'
 
 services:
-  bank-ocr-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  ocr-app:
+    build: .
     container_name: bank-statement-ocr
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
-      - MODEL_ID=${MODEL_ID:-meta-llama/Llama-4-Scout-17B-16E-Instruct}
     volumes:
-      - ./uploads:/app/uploads  # For temporary file storage
-      - ./logs:/app/logs        # For application logs
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - bank-ocr-network
-
-networks:
-  bank-ocr-network:
-    driver: bridge
-
-volumes:
-  uploads:
-  logs:
+      # Mount uploads directory so files persist outside the container
+      - ./uploads:/app/uploads
+      # Mount .env file for Hugging Face credentials
+      - ./.env:/app/.env
+    environment:
+      - PYTHONUNBUFFERED=1

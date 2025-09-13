@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Statement OCR</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 15px;
+            padding: 60px 20px;
+            margin: 20px 0;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #2980b9;
+            background: #e8f4f8;
+        }
+
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background: #e8f5e8;
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #3498db;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .upload-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            padding: 40px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 5px solid #3498db;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-icon {
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            transition: transform 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .summary-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .summary-label {
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .monthly-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .month-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .month-header {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .month-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .month-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        .month-stat-label {
+            color: #555;
+        }
+
+        .month-stat-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .upload-area {
+                padding: 40px 20px;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .summary-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏦 Bank Statement OCR</h1>
+            <p>Upload your bank statement PDF to extract and analyze transaction data</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Click to upload or drag and drop your PDF file</div>
+                <div class="upload-subtext">Supports bank statements in English and Arabic</div>
+            </div>
+            
+            <input type="file" id="fileInput" accept=".pdf" />
+            <button class="upload-btn" onclick="uploadFile()">Process Statement</button>
+        </div>
+
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Processing your bank statement... This may take a few minutes.</p>
+        </div>
+
+        <div class="results" id="results">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // File input handling
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                document.querySelector('.upload-text').textContent = `Selected: ${selectedFile.name}`;
+                document.querySelector('.upload-subtext').textContent = `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`;
+            }
+        });
+
+        // Drag and drop handling
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                selectedFile = files[0];
+                document.getElementById('fileInput').files = files;
+                document.querySelector('.upload-text').textContent = `Selected: ${selectedFile.name}`;
+                document.querySelector('.upload-subtext').textContent = `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`;
+            } else {
+                alert('Please select a PDF file');
+            }
+        });
+
+        async function uploadFile() {
+            if (!selectedFile) {
+                alert('Please select a PDF file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            // Show loading
+            document.querySelector('.upload-section').style.display = 'none';
+            document.querySelector('.loading').style.display = 'block';
+            document.querySelector('.results').style.display = 'none';
+
+            try {
+                const response = await fetch('/upload-pdf/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.querySelector('.loading').style.display = 'none';
+                document.querySelector('.upload-section').style.display = 'block';
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                document.querySelector('.upload-section').appendChild(errorDiv);
+            }
+        }
+
+        function displayResults(data) {
+            document.querySelector('.loading').style.display = 'none';
+            document.querySelector('.results').style.display = 'block';
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            // Extraction Metadata
+            if (data.extraction_metadata) {
+                const metadataSection = createSection('📊 Processing Information', data.extraction_metadata);
+                resultsDiv.appendChild(metadataSection);
+            }
+
+            // Account Information
+            if (data.account_information) {
+                const accountSection = createAccountSection(data.account_information);
+                resultsDiv.appendChild(accountSection);
+            }
+
+            // Transaction Summary
+            if (data.transaction_summary) {
+                const summarySection = createSummarySection(data.transaction_summary);
+                resultsDiv.appendChild(summarySection);
+            }
+
+            // Balance Statistics
+            if (data.balance_statistics) {
+                const balanceSection = createBalanceSection(data.balance_statistics);
+                resultsDiv.appendChild(balanceSection);
+            }
+
+            // Monthly Analysis
+            if (data.monthly_analysis) {
+                const monthlySection = createMonthlySection(data.monthly_analysis);
+                resultsDiv.appendChild(monthlySection);
+            }
+
+            // Analytics
+            if (data.analytics) {
+                const analyticsSection = createAnalyticsSection(data.analytics);
+                resultsDiv.appendChild(analyticsSection);
+            }
+        }
+
+        function createSection(title, data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const titleEl = document.createElement('h2');
+            titleEl.innerHTML = `<span class="section-icon">${title.split(' ')[0]}</span>${title.substring(title.indexOf(' ') + 1)}`;
+            section.appendChild(titleEl);
+
+            const grid = document.createElement('div');
+            grid.className = 'info-grid';
+
+            for (const [key, value] of Object.entries(data)) {
+                if (value !== null && value !== undefined) {
+                    const item = document.createElement('div');
+                    item.className = 'info-item';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'info-label';
+                    label.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    const valueEl = document.createElement('div');
+                    valueEl.className = 'info-value';
+                    valueEl.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+                    
+                    item.appendChild(label);
+                    item.appendChild(valueEl);
+                    grid.appendChild(item);
+                }
+            }
+
+            section.appendChild(grid);
+            return section;
+        }
+
+        function createAccountSection(data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const title = document.createElement('h2');
+            title.innerHTML = '<span class="section-icon">👤</span>Account Information';
+            section.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'info-grid';
+
+            const fields = [
+                { key: 'customer_name', label: 'Customer Name' },
+                { key: 'account_number', label: 'Account Number' },
+                { key: 'iban_number', label: 'IBAN Number' },
+                { key: 'financial_period', label: 'Financial Period' },
+                { key: 'opening_balance', label: 'Opening Balance' },
+                { key: 'closing_balance', label: 'Closing Balance' }
+            ];
+
+            fields.forEach(field => {
+                if (data[field.key] !== null && data[field.key] !== undefined) {
+                    const item = document.createElement('div');
+                    item.className = 'info-item';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'info-label';
+                    label.textContent = field.label;
+                    
+                    const value = document.createElement('div');
+                    value.className = 'info-value';
+                    value.textContent = data[field.key];
+                    
+                    item.appendChild(label);
+                    item.appendChild(value);
+                    grid.appendChild(item);
+                }
+            });
+
+            section.appendChild(grid);
+            return section;
+        }
+
+        function createSummarySection(data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const title = document.createElement('h2');
+            title.innerHTML = '<span class="section-icon">💰</span>Transaction Summary';
+            section.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'summary-grid';
+
+            // Total Deposits
+            const depositsCard = createSummaryCard(
+                'Deposits',
+                data.total_deposits?.count || 0,
+                `$${(data.total_deposits?.amount || 0).toLocaleString()}`
+            );
+            grid.appendChild(depositsCard);
+
+            // Total Withdrawals
+            const withdrawalsCard = createSummaryCard(
+                'Withdrawals',
+                data.total_withdrawals?.count || 0,
+                `$${(data.total_withdrawals?.amount || 0).toLocaleString()}`
+            );
+            grid.appendChild(withdrawalsCard);
+
+            // Net Change
+            const netChange = data.net_change?.amount || 0;
+            const netCard = createSummaryCard(
+                'Net Change',
+                netChange >= 0 ? 'Positive' : 'Negative',
+                `$${Math.abs(netChange).toLocaleString()}`
+            );
+            grid.appendChild(netCard);
+
+            // Balance Verification
+            if (data.balance_verification) {
+                const diff = data.balance_verification.difference || 0;
+                const verificationCard = createSummaryCard(
+                    'Balance Verification',
+                    Math.abs(diff) < 0.01 ? 'Accurate' : 'Discrepancy',
+                    `$${Math.abs(diff).toFixed(2)}`
+                );
+                grid.appendChild(verificationCard);
+            }
+
+            section.appendChild(grid);
+            return section;
+        }
+
+        function createSummaryCard(title, subtitle, value) {
+            const card = document.createElement('div');
+            card.className = 'summary-card';
+            
+            const valueEl = document.createElement('div');
+            valueEl.className = 'summary-number';
+            valueEl.textContent = value;
+            
+            const label = document.createElement('div');
+            label.className = 'summary-label';
+            label.textContent = title;
+            
+            const subLabel = document.createElement('div');
+            subLabel.className = 'summary-label';
+            subLabel.textContent = subtitle;
+            subLabel.style.fontSize = '0.8rem';
+            subLabel.style.marginTop = '5px';
+            subLabel.style.opacity = '0.7';
+            
+            card.appendChild(valueEl);
+            card.appendChild(label);
+            card.appendChild(subLabel);
+            
+            return card;
+        }
+
+        function createBalanceSection(data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const title = document.createElement('h2');
+            title.innerHTML = '<span class="section-icon">📈</span>Balance Statistics';
+            section.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'summary-grid';
+
+            const fields = [
+                { key: 'minimum_balance', label: 'Minimum Balance', prefix: '$' },
+                { key: 'maximum_balance', label: 'Maximum Balance', prefix: '$' },
+                { key: 'average_balance', label: 'Average Balance', prefix: '$' }
+            ];
+
+            fields.forEach(field => {
+                if (data[field.key] !== null && data[field.key] !== undefined) {
+                    const card = createSummaryCard(
+                        field.label,
+                        'Balance Range',
+                        `${field.prefix}${data[field.key].toLocaleString()}`
+                    );
+                    grid.appendChild(card);
+                }
+            });
+
+            section.appendChild(grid);
+            return section;
+        }
+
+        function createMonthlySection(data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const title = document.createElement('h2');
+            title.innerHTML = '<span class="section-icon">📅</span>Monthly Analysis';
+            section.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'monthly-grid';
+
+            for (const [month, monthData] of Object.entries(data)) {
+                const monthCard = document.createElement('div');
+                monthCard.className = 'month-card';
+                
+                const header = document.createElement('div');
+                header.className = 'month-header';
+                header.textContent = month;
+                monthCard.appendChild(header);
+
+                const stats = document.createElement('div');
+                stats.className = 'month-stats';
+
+                const statFields = [
+                    { key: 'opening_balance', label: 'Opening' },
+                    { key: 'closing_balance', label: 'Closing' },
+                    { key: 'total_credit', label: 'Credits' },
+                    { key: 'total_debit', label: 'Debits' },
+                    { key: 'net_change', label: 'Net Change' },
+                    { key: 'transaction_count', label: 'Transactions' }
+                ];
+
+                statFields.forEach(field => {
+                    if (monthData[field.key] !== null && monthData[field.key] !== undefined) {
+                        const stat = document.createElement('div');
+                        stat.className = 'month-stat';
+                        
+                        const label = document.createElement('span');
+                        label.className = 'month-stat-label';
+                        label.textContent = field.label;
+                        
+                        const value = document.createElement('span');
+                        value.className = 'month-stat-value';
+                        if (typeof monthData[field.key] === 'number') {
+                            value.textContent = field.key.includes('balance') || field.key.includes('credit') || field.key.includes('debit') || field.key.includes('change') 
+                                ? `$${monthData[field.key].toLocaleString()}` 
+                                : monthData[field.key].toLocaleString();
+                        } else {
+                            value.textContent = monthData[field.key];
+                        }
+                        
+                        stat.appendChild(label);
+                        stat.appendChild(value);
+                        stats.appendChild(stat);
+                    }
+                });
+
+                monthCard.appendChild(stats);
+                grid.appendChild(monthCard);
+            }
+
+            section.appendChild(grid);
+            return section;
+        }
+
+        function createAnalyticsSection(data) {
+            const section = document.createElement('div');
+            section.className = 'section';
+            
+            const title = document.createElement('h2');
+            title.innerHTML = '<span class="section-icon">📊</span>Analytics';
+            section.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'summary-grid';
+
+            const analyticsFields = [
+                { key: 'sum_total_inflow', label: 'Total Inflow', prefix: '$' },
+                { key: 'sum_total_outflow', label: 'Total Outflow', prefix: '$' },
+                { key: 'avg_total_inflow', label: 'Avg Inflow', prefix: '$' },
+                { key: 'avg_total_outflow', label: 'Avg Outflow', prefix: '$' },
+                { key: 'overdraft_frequency', label: 'Overdraft Count', prefix: '' },
+                { key: 'average_fluctuation', label: 'Avg Fluctuation', prefix: '%', suffix: '' }
+            ];
+
+            analyticsFields.forEach(field => {
+                if (data[field.key] !== null && data[field.key] !== undefined) {
+                    const card = createSummaryCard(
+                        field.label,
+                        'Analytics',
+                        `${field.prefix}${typeof data[field.key] === 'number' ? data[field.key].toLocaleString() : data[field.key]}${field.suffix || ''}`
+                    );
+                    grid.appendChild(card);
+                }
+            });
+
+            section.appendChild(grid);
+            return section;
+        }
+    </script>
+</body>
+</html>

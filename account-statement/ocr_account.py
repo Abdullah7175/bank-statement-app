@@ -13,14 +13,14 @@ from collections import defaultdict
 
 # ---------- Load Environment Variables ----------
 load_dotenv()
-MODEL_ID = os.getenv("MODEL_ID", "Salesforce/blip2-opt-2.7b")
+MODEL_ID = os.getenv("MODEL_ID")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-PDF_PATH = "Bank statments/68200263967000 , Alinma.pdf"
+PDF_PATH = "Bank statments/Alinma EN (1).pdf"
 OUTPUT_JSON = "merged_statement.json"
 
 # ---------- PDF to images ----------
-def pdf_to_images(pdf_path, dpi=150):
+def pdf_to_images(pdf_path, dpi=100):
     doc = fitz.open(pdf_path)
     return [Image.open(io.BytesIO(page.get_pixmap(dpi=dpi).tobytes("png"))) for page in doc]
 
@@ -32,16 +32,10 @@ def encode_image(img):
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode("utf-8")
 
 # ---------- Hugging Face Client ----------
-# Initialize Hugging Face client
-try:
-    client = InferenceClient(provider="fireworks-ai", api_key=HF_TOKEN)
-    print("[INFO] Created Hugging Face client with fireworks-ai provider")
-except Exception as e:
-    print(f"[WARN] Failed to create client with provider, trying standard method: {e}")
-    client = InferenceClient(
-        model=MODEL_ID,
-        token=HF_TOKEN,
-    )
+client = InferenceClient(
+    provider="fireworks-ai",
+    api_key=HF_TOKEN,
+)
 
 SYSTEM_PROMPT = """
 You are a universal bank statement parser for English and Arabic.
@@ -119,44 +113,23 @@ def extract_from_pdf(pdf_path):
     for i, img in enumerate(images, start=1):
         print(f"🔎 Processing Page {i}...")
 
-        # Encode image to base64 for API
         img_b64 = encode_image(img)
-        
-        try:
-            print(f"🔍 Processing page {i} with model: {MODEL_ID}")
-            
-            # Use image_to_text for vision model
-            print(f"📡 Using image_to_text API...")
-            response = client.image_to_text(
-                image=img_b64,
-            )
-            raw_text = response[0].generated_text
-            print(f"📝 Image-to-text extracted: {len(raw_text)} characters")
-            print(f"📝 Raw OCR text preview: {raw_text[:300]}...")
-            
-            # Create a combined prompt for better extraction
-            combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
-            
-            # Use text generation for structured output
-            text_response = client.text_generation(
-                model="microsoft/DialoGPT-medium",
-                inputs=combined_prompt,
-                max_new_tokens=4096,
-                temperature=0.0,
-            )
-            raw_text = text_response[0].generated_text
-            print(f"📝 Text generation completed: {len(raw_text)} characters")
-            
-            print(f"🔍 Raw response preview: {raw_text[:200]}...")
-            page_json = safe_json_parse(raw_text)
-            print(f"📊 Parsed JSON keys: {list(page_json.keys()) if isinstance(page_json, dict) else 'Not a dict'}")
-            print(f"📊 Transactions found: {len(page_json.get('transactions', []))}")
-            
-        except Exception as e:
-            print(f"❌ Error processing page {i}: {e}")
-            import traceback
-            traceback.print_exc()
-            page_json = {"transactions": []}
+
+        response = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Extract structured bank statement data from this page."},
+                    {"type": "image_url", "image_url": {"url": img_b64}}
+                ]}
+            ],
+            max_tokens=4096,
+            temperature=0.0,
+        )
+
+        # NOTE: fireworks returns choices[0].message.content; keep as per user's environment
+        page_json = safe_json_parse(response.choices[0].message["content"])
 
         # merge metadata (fill only if empty)
         for key in ["account_number", "customer_name", "iban_number",
