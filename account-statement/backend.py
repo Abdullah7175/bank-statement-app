@@ -17,7 +17,7 @@ import uvicorn
 
 # ---------- Load Environment Variables ----------
 load_dotenv()
-MODEL_ID = os.getenv("MODEL_ID", "meta-llama/Llama-4-Scout-17B-16E-Instruct")
+MODEL_ID = os.getenv("MODEL_ID", "Salesforce/blip2-opt-2.7b")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Validate required environment variables
@@ -158,9 +158,9 @@ def extract_from_pdf_bytes(pdf_bytes):
                 # Create a combined prompt for better extraction
                 combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
                 
-                # Use text generation to get structured output
+                # Use a different model for text generation
                 text_response = client.text_generation(
-                    model=MODEL_ID,
+                    model="microsoft/DialoGPT-medium",
                     inputs=combined_prompt,
                     max_new_tokens=4096,
                     temperature=0.0,

@@ -13,7 +13,7 @@ from collections import defaultdict
 
 # ---------- Load Environment Variables ----------
 load_dotenv()
-MODEL_ID = os.getenv("MODEL_ID", "meta-llama/Llama-4-Scout-17B-16E-Instruct")
+MODEL_ID = os.getenv("MODEL_ID", "Salesforce/blip2-opt-2.7b")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 PDF_PATH = "Bank statments/68200263967000 , Alinma.pdf"
@@ -131,13 +131,13 @@ def extract_from_pdf(pdf_path):
             # Create a combined prompt for better extraction
             combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
             
-            # Use text generation to get structured output
-            text_response = client.text_generation(
-                model=MODEL_ID,
-                inputs=combined_prompt,
-                max_new_tokens=4096,
-                temperature=0.0,
-            )
+                # Use a different model for text generation
+                text_response = client.text_generation(
+                    model="microsoft/DialoGPT-medium",
+                    inputs=combined_prompt,
+                    max_new_tokens=4096,
+                    temperature=0.0,
+                )
             
             page_json = safe_json_parse(text_response[0].generated_text)
             
