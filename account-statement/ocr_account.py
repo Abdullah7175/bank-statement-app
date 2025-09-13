@@ -115,26 +115,36 @@ def extract_from_pdf(pdf_path):
 
         img_b64 = encode_image(img)
 
-        # Use image_to_text for vision models
-        response = client.image_to_text(
-            image=img_b64,
-        )
+        # Save image to temporary file for image_to_text
+        temp_img_path = f"temp_img_{i}_{int(time.time())}.png"
+        img.save(temp_img_path)
+        
+        try:
+            # Use image_to_text for vision models
+            response = client.image_to_text(
+                image=temp_img_path,
+            )
 
-        # Parse the response and add system prompt context
-        raw_text = response[0].generated_text
-        
-        # Create a combined prompt for better extraction
-        combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
-        
-        # Use text generation to get structured output
-        text_response = client.text_generation(
-            model=MODEL_ID,
-            inputs=combined_prompt,
-            max_new_tokens=4096,
-            temperature=0.0,
-        )
-        
-        page_json = safe_json_parse(text_response[0].generated_text)
+            # Parse the response and add system prompt context
+            raw_text = response[0].generated_text
+            
+            # Create a combined prompt for better extraction
+            combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
+            
+            # Use text generation to get structured output
+            text_response = client.text_generation(
+                model=MODEL_ID,
+                inputs=combined_prompt,
+                max_new_tokens=4096,
+                temperature=0.0,
+            )
+            
+            page_json = safe_json_parse(text_response[0].generated_text)
+            
+        finally:
+            # Clean up temporary image file
+            if os.path.exists(temp_img_path):
+                os.remove(temp_img_path)
 
         # merge metadata (fill only if empty)
         for key in ["account_number", "customer_name", "iban_number",
