@@ -145,8 +145,6 @@ def extract_from_pdf_bytes(pdf_bytes):
             # Use image_to_text for vision models
             response = client.image_to_text(
                 image=img_b64,
-                max_new_tokens=4096,
-                temperature=0.0,
             )
 
             # Parse the response and add system prompt context
