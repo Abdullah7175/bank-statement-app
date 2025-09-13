@@ -6,17 +6,20 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies needed by PyMuPDF (fitz) and Pillow
-RUN apt-get update && apt-get install -y \
+# Install minimal system dependencies needed by PyMuPDF (fitz) and Pillow
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libgl1 \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libpoppler-cpp-dev \
     libjpeg-dev \
     zlib1g-dev \
     libpng-dev \
     libfreetype6-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
