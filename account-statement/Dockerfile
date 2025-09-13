@@ -9,7 +9,7 @@ WORKDIR /app
 # Install minimal system dependencies needed by PyMuPDF (fitz) and Pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libpoppler-cpp-dev \
     libjpeg-dev \
