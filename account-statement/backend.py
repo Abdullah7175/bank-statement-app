@@ -17,7 +17,7 @@ import uvicorn
 
 # ---------- Load Environment Variables ----------
 load_dotenv()
-MODEL_ID = os.getenv("MODEL_ID", "meta-llama/Llama-3.1-70B-Instruct")
+MODEL_ID = os.getenv("MODEL_ID", "Salesforce/blip2-opt-2.7b")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Validate required environment variables
@@ -150,44 +150,39 @@ def extract_from_pdf_bytes(pdf_bytes):
             img_b64 = encode_image(img)
             
             try:
-                # Try chat completions first (for fireworks-ai provider)
-                try:
-                    response = client.chat.completions.create(
-                        model=MODEL_ID,
-                        messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            {"role": "user", "content": [
-                                {"type": "text", "text": "Extract all details and transactions from this statement."},
-                                {"type": "image_url", "image_url": {"url": img_b64}}
-                            ]}
-                        ],
-                        temperature=0,
-                        max_tokens=3072,
-                        response_format={"type": "json_object"}
-                    )
-                    raw_text = response.choices[0].message["content"]
-                except AttributeError:
-                    # Fallback to image_to_text + text_generation for standard InferenceClient
-                    response = client.image_to_text(
-                        image=img_b64,
-                    )
-                    raw_text = response[0].generated_text
-                    
-                    # Create a combined prompt for better extraction
-                    combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
-                    
-                    text_response = client.text_generation(
-                        model=MODEL_ID,
-                        inputs=combined_prompt,
-                        max_new_tokens=4096,
-                        temperature=0.0,
-                    )
-                    raw_text = text_response[0].generated_text
+                print(f"🔍 Processing page {i} with model: {MODEL_ID}")
                 
+                # Use image_to_text for vision model
+                print(f"📡 Using image_to_text API...")
+                response = client.image_to_text(
+                    image=img_b64,
+                )
+                raw_text = response[0].generated_text
+                print(f"📝 Image-to-text extracted: {len(raw_text)} characters")
+                print(f"📝 Raw OCR text preview: {raw_text[:300]}...")
+                
+                # Create a combined prompt for better extraction
+                combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
+                
+                # Use text generation for structured output
+                text_response = client.text_generation(
+                    model="microsoft/DialoGPT-medium",
+                    inputs=combined_prompt,
+                    max_new_tokens=4096,
+                    temperature=0.0,
+                )
+                raw_text = text_response[0].generated_text
+                print(f"📝 Text generation completed: {len(raw_text)} characters")
+                
+                print(f"🔍 Raw response preview: {raw_text[:200]}...")
                 page_json = safe_json_parse(raw_text)
+                print(f"📊 Parsed JSON keys: {list(page_json.keys()) if isinstance(page_json, dict) else 'Not a dict'}")
+                print(f"📊 Transactions found: {len(page_json.get('transactions', []))}")
                 
             except Exception as e:
                 print(f"❌ Error processing page {i}: {e}")
+                import traceback
+                traceback.print_exc()
                 page_json = {"transactions": []}
 
             # merge metadata (fill only if empty)
