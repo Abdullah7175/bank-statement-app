@@ -17,7 +17,7 @@ import uvicorn
 
 # ---------- Load Environment Variables ----------
 load_dotenv()
-MODEL_ID = os.getenv("MODEL_ID", "Salesforce/blip2-opt-2.7b")
+MODEL_ID = os.getenv("MODEL_ID", "meta-llama/Llama-3.1-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Validate required environment variables
@@ -49,10 +49,8 @@ def encode_image(img):
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode("utf-8")
 
 # ---------- Hugging Face Client ----------
-client = InferenceClient(
-    model=MODEL_ID,
-    token=HF_TOKEN,
-)
+# Initialize Hugging Face client (using provider like working code)
+client = InferenceClient(provider="fireworks-ai", api_key=HF_TOKEN)
 
 SYSTEM_PROMPT = """
 You are a universal bank statement parser for English and Arabic.
@@ -140,38 +138,31 @@ def extract_from_pdf_bytes(pdf_bytes):
         for i, img in enumerate(images, start=1):
             print(f"🔎 Processing Page {i}...")
 
+            # Encode image to base64 for API
             img_b64 = encode_image(img)
-
-            # Save image to temporary file for image_to_text
-            temp_img_path = f"uploads/temp_img_{i}_{int(time.time())}.png"
-            img.save(temp_img_path)
             
             try:
-                # Use image_to_text for vision models
-                response = client.image_to_text(
-                    image=temp_img_path,
-                )
-
-                # Parse the response and add system prompt context
-                raw_text = response[0].generated_text
-                
-                # Create a combined prompt for better extraction
-                combined_prompt = f"{SYSTEM_PROMPT}\n\nExtracted text from image:\n{raw_text}\n\nPlease extract structured bank statement data from the above text and return ONLY valid JSON."
-                
-                # Use a different model for text generation
-                text_response = client.text_generation(
-                    model="microsoft/DialoGPT-medium",
-                    inputs=combined_prompt,
-                    max_new_tokens=4096,
-                    temperature=0.0,
+                # Use chat completions with vision model (like the working code)
+                response = client.chat.completions.create(
+                    model=MODEL_ID,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": [
+                            {"type": "text", "text": "Extract all details and transactions from this statement."},
+                            {"type": "image_url", "image_url": {"url": img_b64}}
+                        ]}
+                    ],
+                    temperature=0,
+                    max_tokens=3072,
+                    response_format={"type": "json_object"}
                 )
                 
-                page_json = safe_json_parse(text_response[0].generated_text)
+                raw_text = response.choices[0].message["content"]
+                page_json = safe_json_parse(raw_text)
                 
-            finally:
-                # Clean up temporary image file
-                if os.path.exists(temp_img_path):
-                    os.remove(temp_img_path)
+            except Exception as e:
+                print(f"❌ Error processing page {i}: {e}")
+                page_json = {"transactions": []}
 
             # merge metadata (fill only if empty)
             for key in ["account_number", "customer_name", "iban_number",
