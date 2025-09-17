@@ -219,23 +219,66 @@
             font-size: 0.9rem;
         }
 
-        .monthly-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .month-card {
+        .monthly-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
             background: white;
-            padding: 20px;
             border-radius: 10px;
-            border: 1px solid #e9ecef;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
-        .month-header {
-            font-weight: bold;
+        .monthly-table th,
+        .monthly-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .monthly-table th {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .monthly-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .monthly-table tr:hover {
+            background-color: #e8f4f8;
+            transition: background-color 0.3s ease;
+        }
+
+        .monthly-table td {
+            font-size: 0.9rem;
             color: #2c3e50;
-            font-size: 1.2rem;
+        }
+
+        .monthly-table .month-name {
+            font-weight: 600;
+            color: #34495e;
+        }
+
+        .monthly-table .positive {
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .monthly-table .negative {
+            color: #e74c3c;
+            font-weight: 500;
+        }
+
+        .monthly-table .neutral {
+            color: #7f8c8d;
+        }
+
+        .month-stats {
             margin-bottom: 15px;
             text-align: center;
             padding-bottom: 10px;
@@ -412,6 +455,32 @@
             }
         }
 
+        function formatProcessingTime(seconds) {
+            if (seconds < 60) {
+                return `${seconds.toFixed(1)} sec`;
+            } else if (seconds < 3600) {
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                if (remainingSeconds === 0) {
+                    return `${minutes} min`;
+                } else {
+                    return `${minutes} min ${remainingSeconds} sec`;
+                }
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                let result = `${hours} hr`;
+                if (minutes > 0) {
+                    result += ` ${minutes} min`;
+                }
+                if (remainingSeconds > 0) {
+                    result += ` ${remainingSeconds} sec`;
+                }
+                return result;
+            }
+        }
+
         function displayResults(data) {
             document.querySelector('.loading').style.display = 'none';
             document.querySelector('.results').style.display = 'block';
@@ -419,15 +488,21 @@
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '';
 
-            // Extraction Metadata
+            // Extraction Metadata with formatted processing time
             if (data.extraction_metadata) {
-                const metadataSection = createSection('📊 Processing Information', data.extraction_metadata);
+                const metadataData = { ...data.extraction_metadata };
+                // Format processing time and remove the raw processing_time
+                if (metadataData.processing_time) {
+                    metadataData.processing_time_formatted = formatProcessingTime(metadataData.processing_time);
+                    delete metadataData.processing_time; // Remove the raw processing time
+                }
+                const metadataSection = createSection('📊 Processing Information', metadataData);
                 resultsDiv.appendChild(metadataSection);
             }
 
             // Account Information
-            if (data.account_information) {
-                const accountSection = createAccountSection(data.account_information);
+            if (data.account_info) {
+                const accountSection = createAccountSection(data.account_info);
                 resultsDiv.appendChild(accountSection);
             }
 
@@ -438,8 +513,8 @@
             }
 
             // Balance Statistics
-            if (data.balance_statistics) {
-                const balanceSection = createBalanceSection(data.balance_statistics);
+            if (data.transaction_summary && data.transaction_summary.balance_statistics) {
+                const balanceSection = createBalanceSection(data.transaction_summary.balance_statistics);
                 resultsDiv.appendChild(balanceSection);
             }
 
@@ -474,10 +549,23 @@
                     
                     const label = document.createElement('div');
                     label.className = 'info-label';
-                    label.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    // Special handling for processing time
+                    if (key === 'processing_time_formatted') {
+                        label.textContent = 'Processing Time';
+                    } else {
+                        label.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    }
                     
                     const valueEl = document.createElement('div');
                     valueEl.className = 'info-value';
+                    
+                    // Special styling for processing time
+                    if (key === 'processing_time_formatted') {
+                        valueEl.style.color = '#27ae60';
+                        valueEl.style.fontWeight = 'bold';
+                    }
+                    
                     valueEl.textContent = typeof value === 'number' ? value.toLocaleString() : value;
                     
                     item.appendChild(label);
@@ -502,10 +590,10 @@
             grid.className = 'info-grid';
 
             const fields = [
-                { key: 'customer_name', label: 'Customer Name' },
+                { key: 'account_name', label: 'Account Name' },
                 { key: 'account_number', label: 'Account Number' },
                 { key: 'iban_number', label: 'IBAN Number' },
-                { key: 'financial_period', label: 'Financial Period' },
+                { key: 'statement_date', label: 'Statement Date' },
                 { key: 'opening_balance', label: 'Opening Balance' },
                 { key: 'closing_balance', label: 'Closing Balance' }
             ];
@@ -548,7 +636,7 @@
             const depositsCard = createSummaryCard(
                 'Deposits',
                 data.total_deposits?.count || 0,
-                `$${(data.total_deposits?.amount || 0).toLocaleString()}`
+                `${(data.total_deposits?.amount || 0).toLocaleString()} SAR`
             );
             grid.appendChild(depositsCard);
 
@@ -556,7 +644,7 @@
             const withdrawalsCard = createSummaryCard(
                 'Withdrawals',
                 data.total_withdrawals?.count || 0,
-                `$${(data.total_withdrawals?.amount || 0).toLocaleString()}`
+                `${(data.total_withdrawals?.amount || 0).toLocaleString()} SAR`
             );
             grid.appendChild(withdrawalsCard);
 
@@ -565,7 +653,7 @@
             const netCard = createSummaryCard(
                 'Net Change',
                 netChange >= 0 ? 'Positive' : 'Negative',
-                `$${Math.abs(netChange).toLocaleString()}`
+                `${Math.abs(netChange).toLocaleString()} SAR`
             );
             grid.appendChild(netCard);
 
@@ -575,7 +663,7 @@
                 const verificationCard = createSummaryCard(
                     'Balance Verification',
                     Math.abs(diff) < 0.01 ? 'Accurate' : 'Discrepancy',
-                    `$${Math.abs(diff).toFixed(2)}`
+                    `${Math.abs(diff).toFixed(2)} SAR`
                 );
                 grid.appendChild(verificationCard);
             }
@@ -622,9 +710,9 @@
             grid.className = 'summary-grid';
 
             const fields = [
-                { key: 'minimum_balance', label: 'Minimum Balance', prefix: '$' },
-                { key: 'maximum_balance', label: 'Maximum Balance', prefix: '$' },
-                { key: 'average_balance', label: 'Average Balance', prefix: '$' }
+                { key: 'minimum_balance', label: 'Minimum Balance', suffix: ' SAR' },
+                { key: 'maximum_balance', label: 'Maximum Balance', suffix: ' SAR' },
+                { key: 'average_balance', label: 'Average Balance', suffix: ' SAR' }
             ];
 
             fields.forEach(field => {
@@ -632,7 +720,7 @@
                     const card = createSummaryCard(
                         field.label,
                         'Balance Range',
-                        `${field.prefix}${data[field.key].toLocaleString()}`
+                        `${data[field.key].toLocaleString()}${field.suffix}`
                     );
                     grid.appendChild(card);
                 }
@@ -650,60 +738,119 @@
             title.innerHTML = '<span class="section-icon">📅</span>Monthly Analysis';
             section.appendChild(title);
 
-            const grid = document.createElement('div');
-            grid.className = 'monthly-grid';
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'monthly-table';
 
-            for (const [month, monthData] of Object.entries(data)) {
-                const monthCard = document.createElement('div');
-                monthCard.className = 'month-card';
+            // Create header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            const headers = [
+                'Month',
+                'Opening Balance', 
+                'Closing Balance',
+                'Total Credit',
+                'Total Debit', 
+                'Net Change',
+                'Transactions'
+            ];
+
+            headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create body
+            const tbody = document.createElement('tbody');
+
+            // Function to get month name from YYYY-MM format
+            function getMonthName(monthKey) {
+                const monthNames = {
+                    '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+                    '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', 
+                    '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'
+                };
                 
-                const header = document.createElement('div');
-                header.className = 'month-header';
-                header.textContent = month;
-                monthCard.appendChild(header);
-
-                const stats = document.createElement('div');
-                stats.className = 'month-stats';
-
-                const statFields = [
-                    { key: 'opening_balance', label: 'Opening' },
-                    { key: 'closing_balance', label: 'Closing' },
-                    { key: 'total_credit', label: 'Credits' },
-                    { key: 'total_debit', label: 'Debits' },
-                    { key: 'net_change', label: 'Net Change' },
-                    { key: 'transaction_count', label: 'Transactions' }
-                ];
-
-                statFields.forEach(field => {
-                    if (monthData[field.key] !== null && monthData[field.key] !== undefined) {
-                        const stat = document.createElement('div');
-                        stat.className = 'month-stat';
-                        
-                        const label = document.createElement('span');
-                        label.className = 'month-stat-label';
-                        label.textContent = field.label;
-                        
-                        const value = document.createElement('span');
-                        value.className = 'month-stat-value';
-                        if (typeof monthData[field.key] === 'number') {
-                            value.textContent = field.key.includes('balance') || field.key.includes('credit') || field.key.includes('debit') || field.key.includes('change') 
-                                ? `$${monthData[field.key].toLocaleString()}` 
-                                : monthData[field.key].toLocaleString();
-                        } else {
-                            value.textContent = monthData[field.key];
-                        }
-                        
-                        stat.appendChild(label);
-                        stat.appendChild(value);
-                        stats.appendChild(stat);
-                    }
-                });
-
-                monthCard.appendChild(stats);
-                grid.appendChild(monthCard);
+                if (monthKey.includes('-')) {
+                    const [year, month] = monthKey.split('-');
+                    return monthNames[month] || monthKey;
+                }
+                return monthKey;
             }
 
-            section.appendChild(grid);
+            // Function to format currency
+            function formatCurrency(value) {
+                if (value === null || value === undefined) return 'SAR 0.00';
+                return `SAR ${Number(value).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            }
+
+            // Function to get value class based on number
+            function getValueClass(value) {
+                if (value > 0) return 'positive';
+                if (value < 0) return 'negative';
+                return 'neutral';
+            }
+
+            // Sort months chronologically
+            const sortedEntries = Object.entries(data).sort(([a], [b]) => {
+                if (a.includes('-') && b.includes('-')) {
+                    return new Date(a + '-01').getTime() - new Date(b + '-01').getTime();
+                }
+                return a.localeCompare(b);
+            });
+
+            sortedEntries.forEach(([month, monthData]) => {
+                const row = document.createElement('tr');
+                
+                // Month name
+                const monthCell = document.createElement('td');
+                monthCell.className = 'month-name';
+                monthCell.textContent = getMonthName(month);
+                row.appendChild(monthCell);
+                
+                // Opening Balance
+                const openingCell = document.createElement('td');
+                openingCell.textContent = formatCurrency(monthData.opening_balance);
+                row.appendChild(openingCell);
+                
+                // Closing Balance  
+                const closingCell = document.createElement('td');
+                closingCell.textContent = formatCurrency(monthData.closing_balance);
+                row.appendChild(closingCell);
+                
+                // Total Credit
+                const creditCell = document.createElement('td');
+                creditCell.textContent = formatCurrency(monthData.total_credit);
+                creditCell.className = monthData.total_credit > 0 ? 'positive' : 'neutral';
+                row.appendChild(creditCell);
+                
+                // Total Debit
+                const debitCell = document.createElement('td');
+                debitCell.textContent = formatCurrency(monthData.total_debit);
+                debitCell.className = monthData.total_debit > 0 ? 'negative' : 'neutral';
+                row.appendChild(debitCell);
+                
+                // Net Change
+                const netChangeCell = document.createElement('td');
+                netChangeCell.textContent = formatCurrency(monthData.net_change);
+                netChangeCell.className = getValueClass(monthData.net_change);
+                row.appendChild(netChangeCell);
+                
+                // Transaction Count
+                const transactionCell = document.createElement('td');
+                transactionCell.textContent = monthData.transaction_count || 0;
+                row.appendChild(transactionCell);
+                
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
+            section.appendChild(table);
             return section;
         }
 
@@ -719,12 +866,12 @@
             grid.className = 'summary-grid';
 
             const analyticsFields = [
-                { key: 'sum_total_inflow', label: 'Total Inflow', prefix: '$' },
-                { key: 'sum_total_outflow', label: 'Total Outflow', prefix: '$' },
-                { key: 'avg_total_inflow', label: 'Avg Inflow', prefix: '$' },
-                { key: 'avg_total_outflow', label: 'Avg Outflow', prefix: '$' },
-                { key: 'overdraft_frequency', label: 'Overdraft Count', prefix: '' },
-                { key: 'average_fluctuation', label: 'Avg Fluctuation', prefix: '%', suffix: '' }
+                { key: 'sum_total_inflow', label: 'Total Inflow', suffix: ' SAR' },
+                { key: 'sum_total_outflow', label: 'Total Outflow', suffix: ' SAR' },
+                { key: 'avg_total_inflow', label: 'Avg Inflow', suffix: ' SAR' },
+                { key: 'avg_total_outflow', label: 'Avg Outflow', suffix: ' SAR' },
+                { key: 'overdraft_frequency', label: 'Overdraft Count', suffix: '' },
+                { key: 'average_fluctuation', label: 'Avg Fluctuation', suffix: '%' }
             ];
 
             analyticsFields.forEach(field => {
@@ -732,7 +879,7 @@
                     const card = createSummaryCard(
                         field.label,
                         'Analytics',
-                        `${field.prefix}${typeof data[field.key] === 'number' ? data[field.key].toLocaleString() : data[field.key]}${field.suffix || ''}`
+                        `${typeof data[field.key] === 'number' ? data[field.key].toLocaleString() : data[field.key]}${field.suffix}`
                     );
                     grid.appendChild(card);
                 }
@@ -744,3 +891,4 @@
     </script>
 </body>
 </html>
+
